@@ -1,21 +1,27 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import { createForm, updateForm, getFormById } from "../services/form.service";
 import {
-  createForm,
-  updateForm,
-  getFormById,
   addFieldsToForm,
   updateField,
   deleteField,
-} from "../services/form.service";
+} from "../services/field.service";
 
-const FIELD_TYPES = ["Text", "Textarea", "Number", "Color", "Select", "Radio", "Date"];
+const FIELD_TYPES = [
+  "Text",
+  "Textarea",
+  "Number",
+  "Color",
+  "Select",
+  "Radio",
+  "Date",
+];
 
 let _counter = 0;
 const makeField = (type, order) => ({
   _localId: `f_${Date.now()}_${++_counter}`,
-  _id: null,           // null = new (not yet saved to server)
+  _id: null, // null = new (not yet saved to server)
   _modified: false,
   type: type.toLowerCase(),
   label: "Field name",
@@ -23,32 +29,74 @@ const makeField = (type, order) => ({
   order: String(order),
   require: false,
   options: [],
+  min: "",
+  max: "",
 });
 
 // --- FieldCard ---
-const FieldCard = ({ field, index, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isOver }) => {
+const FieldCard = ({
+  field,
+  index,
+  onUpdate,
+  onDelete,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isOver,
+}) => {
   const [editLabel, setEditLabel] = useState(false);
   const [editPlaceholder, setEditPlaceholder] = useState(false);
+  const [optionsText, setOptionsText] = useState(
+    (field.options || []).join(", "),
+  );
+
+  useEffect(() => {
+    setOptionsText((prev) => {
+      const prevParsed = prev
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(",");
+      const propParsed = (field.options || []).join(",");
+      return prevParsed === propParsed
+        ? prev
+        : (field.options || []).join(", ");
+    });
+  }, [field.options]);
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(index)}
-      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
-      onDrop={(e) => { e.preventDefault(); onDrop(); }}
-      className={`border rounded-lg p-3 bg-white relative min-h-[90px] transition-all ${
-        isOver ? "border-[#014b62] shadow-md" : "border-[#9fc8d4]"
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver(index);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      className={`group border rounded-lg p-3 bg-white relative min-h-[90px] transition-all ${
+        isOver
+          ? "border-[#014b62] shadow-md z-30"
+          : "border-[#9fc8d4] hover:z-20"
       }`}
     >
-      {/* Drag handle */}
-      <div className="absolute top-2 right-2 cursor-move select-none text-[#8ba8b4] font-bold text-sm">≡</div>
+      <div className="absolute top-2 right-3 flex gap-4">
+        {/* Delete field button */}
+        <button
+          onClick={() => onDelete(index)}
+          className="text-red-500 hover:text-red-700 leading-none cursor-pointer"
+          title="Remove field"
+        >
+          ✕
+        </button>
 
-      {/* Delete field button */}
-      <button
-        onClick={() => onDelete(index)}
-        className="absolute top-2 right-7 text-red-300 hover:text-red-500 text-xs leading-none"
-        title="Remove field"
-      >✕</button>
+        {/* Drag handle */}
+        <div className="cursor-move select-none text-[#8ba8b4] font-bold text-lg">
+          ⋮⋮⋮
+        </div>
+      </div>
 
       {/* Label */}
       <div className="mb-2 mr-10">
@@ -87,11 +135,174 @@ const FieldCard = ({ field, index, onUpdate, onDelete, onDragStart, onDragOver, 
       ) : (
         <div
           onClick={() => setEditPlaceholder(true)}
-          className="w-full px-3 py-1.5 border border-[#9fc8d4] rounded text-sm text-[#9fc8d4] cursor-text truncate"
+          className={`relative w-full border border-[#9fc8d4] rounded bg-white flex items-center cursor-text overflow-hidden ${field.type === "textarea" ? "h-20 items-start" : ""}`}
         >
-          {field.placeholder || `Enter ${field.label.toLowerCase()}`}
+          {field.type === "color" && (
+            <div
+              className="w-5 h-5 rounded ml-2 border border-gray-200"
+              style={{ backgroundColor: "#e2e8f0" }}
+            ></div>
+          )}
+          {field.type === "radio" && (
+            <div className="w-3.5 h-3.5 rounded-full ml-3 border-2 border-[#9fc8d4] flex-shrink-0"></div>
+          )}
+          <div className="flex-1 px-3 py-1.5 text-sm text-[#9fc8d4] truncate mt-[1px]">
+            {field.placeholder ||
+              (field.type === "select"
+                ? "Select an option"
+                : `Enter ${field.label.toLowerCase()}`)}
+          </div>
+          {field.type === "number" && (
+            <div className="absolute inset-y-0 right-0 flex flex-col items-center justify-center px-1.5 border-l border-[#9fc8d4] bg-[#f0f7f9] text-[#9fc8d4]">
+              <svg
+                className="w-3 h-3 -mb-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 15l7-7 7 7"
+                />
+              </svg>
+              <svg
+                className="w-3 h-3 -mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+          )}
+          {field.type === "date" && (
+            <div className="absolute right-3 text-[#9fc8d4] pointer-events-none flex items-center h-full">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          )}
+          {field.type === "select" && (
+            <div className="absolute right-3 text-[#9fc8d4] pointer-events-none flex items-center h-full">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+          )}
+          {field.type === "textarea" && (
+            <div className="absolute bottom-1 right-1 text-[#9fc8d4] pointer-events-none">
+              <svg
+                className="w-2.5 h-2.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M14 20l6-6M8 20l12-12"
+                />
+              </svg>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Hover Settings Overlay */}
+      <div className="absolute inset-x-[-1px] top-[90%] translate-y-full opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 z-100 p-2 bg-white border border-t-0 border-[#9fc8d4] rounded-b-lg shadow-xl flex flex-wrap gap-3 invisible group-hover:visible">
+        <div className="shrink-0 w-full items-center pt-[1.125rem]">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!field.require}
+              onChange={(e) => onUpdate(index, "require", e.target.checked)}
+              className="w-4 h-4 cursor-pointer accent-[#014b62]"
+            />
+            <span className="text-xs font-bold text-[#014b62]">Required</span>
+          </label>
+        </div>
+
+        {["select", "radio"].includes(field.type) && (
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-[#014b62] mb-1">
+              Options (comma separated)
+            </label>
+            <input
+              type="text"
+              value={optionsText}
+              onChange={(e) => {
+                setOptionsText(e.target.value);
+                onUpdate(
+                  index,
+                  "options",
+                  e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                );
+              }}
+              className="w-full px-2 py-1.5 text-xs border border-gray-200 focus:border-[#9fc8d4] rounded outline-none"
+              placeholder="Option 1, Option 2, Option 3..."
+            />
+          </div>
+        )}
+        {["text", "textarea", "number"].includes(field.type) && (
+          <>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-[#014b62] mb-1">
+                Min Value / Length
+              </label>
+              <input
+                type="number"
+                value={field.min ?? ""}
+                onChange={(e) => onUpdate(index, "min", e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 focus:border-[#9fc8d4] rounded outline-none"
+                placeholder="Optional"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-[#014b62] mb-1">
+                Max Value / Length
+              </label>
+              <input
+                type="number"
+                value={field.max ?? ""}
+                onChange={(e) => onUpdate(index, "max", e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 focus:border-[#9fc8d4] rounded outline-none"
+                placeholder="Optional"
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -100,18 +311,42 @@ const FieldCard = ({ field, index, onUpdate, onDelete, onDragStart, onDragOver, 
 const Stepper = ({ step }) => (
   <div className="flex items-center justify-center py-8 gap-0">
     <div className="flex flex-col items-center gap-2">
-      <div className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${step === 1 ? "bg-[#c8d9df]" : ""}`}>
-        <svg className="w-8 h-8 text-[#014b62]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+      <div
+        className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${step === 1 ? "bg-[#c8d9df]" : ""}`}
+      >
+        <svg
+          className="w-8 h-8 text-[#014b62]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+          />
         </svg>
       </div>
       <span className="text-sm font-bold text-[#014b62]">Form Information</span>
     </div>
     <div className="w-48 h-[2px] bg-[#014b62] opacity-40 mx-2 mb-6" />
     <div className="flex flex-col items-center gap-2">
-      <div className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${step === 2 ? "bg-[#c8d9df]" : ""}`}>
-        <svg className="w-8 h-8 text-[#014b62]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <div
+        className={`flex items-center justify-center w-16 h-16 rounded-xl transition-all ${step === 2 ? "bg-[#c8d9df]" : ""}`}
+      >
+        <svg
+          className="w-8 h-8 text-[#014b62]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
         </svg>
       </div>
       <span className="text-sm font-bold text-[#014b62]">Field and Layout</span>
@@ -122,7 +357,7 @@ const Stepper = ({ step }) => (
 // --- Main Page ---
 const CreateForm = () => {
   const navigate = useNavigate();
-  const { id: editId } = useParams();           // present when editing
+  const { id: editId } = useParams(); // present when editing
   const isEditMode = Boolean(editId);
 
   const [step, setStep] = useState(1);
@@ -165,7 +400,9 @@ const CreateForm = () => {
             order: String(f.order),
             require: f.require || false,
             options: f.options || [],
-          }))
+            min: f.min ?? "",
+            max: f.max ?? "",
+          })),
         );
         setStep(1); // start at step 1 so user can review/change info first
       } catch (err) {
@@ -189,10 +426,19 @@ const CreateForm = () => {
     setLoading(true);
     try {
       if (isEditMode) {
-        await updateForm(editId, { title: title.trim(), description: description.trim(), order: Number(order), status });
+        await updateForm(editId, {
+          title: title.trim(),
+          description: description.trim(),
+          order: Number(order),
+          status,
+        });
         setStep(2);
       } else {
-        const data = await createForm({ title: title.trim(), description: description.trim(), order: Number(order) });
+        const data = await createForm({
+          title: title.trim(),
+          description: description.trim(),
+          order: Number(order),
+        });
         setFormId(data.newForm._id);
         setStep(2);
       }
@@ -211,7 +457,9 @@ const CreateForm = () => {
 
   const handleUpdateField = useCallback((index, key, value) => {
     setFields((prev) =>
-      prev.map((f, i) => i === index ? { ...f, [key]: value, _modified: true } : f)
+      prev.map((f, i) =>
+        i === index ? { ...f, [key]: value, _modified: true } : f,
+      ),
     );
   }, []);
 
@@ -221,21 +469,34 @@ const CreateForm = () => {
       if (field._id) {
         setDeletedFieldIds((ids) => [...ids, field._id]);
       }
-      return prev.filter((_, i) => i !== index).map((f, i) => ({ ...f, order: String(i + 1) }));
+      return prev
+        .filter((_, i) => i !== index)
+        .map((f, i) => ({ ...f, order: String(i + 1) }));
     });
   }, []);
 
-  const handleDragStart = useCallback((index) => { dragIndex.current = index; }, []);
-  const handleDragOver = useCallback((index) => { setOverIndex(index); }, []);
+  const handleDragStart = useCallback((index) => {
+    dragIndex.current = index;
+  }, []);
+  const handleDragOver = useCallback((index) => {
+    setOverIndex(index);
+  }, []);
   const handleDrop = useCallback(() => {
     const from = dragIndex.current;
     const to = overIndex;
-    if (from === null || to === null || from === to) { setOverIndex(null); return; }
+    if (from === null || to === null || from === to) {
+      setOverIndex(null);
+      return;
+    }
     setFields((prev) => {
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      return next.map((f, i) => ({ ...f, order: String(i + 1), _modified: true }));
+      return next.map((f, i) => ({
+        ...f,
+        order: String(i + 1),
+        _modified: true,
+      }));
     });
     dragIndex.current = null;
     setOverIndex(null);
@@ -248,33 +509,56 @@ const CreateForm = () => {
     setError("");
     try {
       // Delete removed fields
-      await Promise.all(deletedFieldIds.map((fid) => deleteField(targetId, fid)));
+      await Promise.all(
+        deletedFieldIds.map((fid) => deleteField(targetId, fid)),
+      );
 
       // New fields (no _id)
       const newFields = fields.filter((f) => !f._id);
       if (newFields.length > 0) {
-        await addFieldsToForm(targetId, newFields.map((f, i) => ({
-          type: f.type,
-          label: f.label,
-          placeholder: f.placeholder || `Enter ${f.label.toLowerCase()}`,
-          order: f.order,
-          require: f.require,
-          ...(f.options?.length ? { options: f.options } : {}),
-        })));
+        await addFieldsToForm(
+          targetId,
+          newFields.map((f, i) => ({
+            type: f.type,
+            label: f.label,
+            placeholder: f.placeholder || `Enter ${f.label.toLowerCase()}`,
+            order: f.order,
+            require: f.require,
+            ...(f.options?.length ? { options: f.options } : {}),
+            ...(f.min !== "" && f.min !== null && f.min !== undefined
+              ? { min: Number(f.min) }
+              : {}),
+            ...(f.max !== "" && f.max !== null && f.max !== undefined
+              ? { max: Number(f.max) }
+              : {}),
+          })),
+        );
       }
 
       // Existing modified fields
       const modifiedFields = fields.filter((f) => f._id && f._modified);
-      await Promise.all(modifiedFields.map((f) =>
-        updateField(targetId, f._id, {
-          type: f.type,
-          label: f.label,
-          placeholder: f.placeholder || `Enter ${f.label.toLowerCase()}`,
-          order: f.order,
-          require: f.require,
-          ...(f.options?.length ? { options: f.options } : {}),
-        })
-      ));
+      if (modifiedFields.length > 0) {
+        await Promise.all(
+          modifiedFields.map((f) =>
+            updateField(targetId, f._id, {
+              type: f.type,
+              label: f.label,
+              placeholder: f.placeholder || `Enter ${f.label.toLowerCase()}`,
+              order: f.order,
+              require: f.require,
+              ...(f.options?.length ? { options: f.options } : {}),
+              min:
+                f.min !== "" && f.min !== null && f.min !== undefined
+                  ? Number(f.min)
+                  : null,
+              max:
+                f.max !== "" && f.max !== null && f.max !== undefined
+                  ? Number(f.max)
+                  : null,
+            }),
+          ),
+        );
+      }
 
       navigate("/forms");
     } catch (err) {
@@ -302,7 +586,9 @@ const CreateForm = () => {
         <div className="flex-1 bg-white flex flex-col">
           {/* Header */}
           <div className="flex justify-end px-10 pt-6 pb-2">
-            <h1 className="text-3xl font-extrabold text-[#014b62]">Form Management</h1>
+            <h1 className="text-3xl font-extrabold text-[#014b62]">
+              Form Management
+            </h1>
           </div>
 
           <Stepper step={step} />
@@ -316,9 +602,14 @@ const CreateForm = () => {
           {/* ── STEP 1 ── */}
           {step === 1 && (
             <div className="flex flex-col items-center flex-1 px-10 pb-10">
-              <form onSubmit={handleStep1Submit} className="w-full max-w-lg space-y-5">
+              <form
+                onSubmit={handleStep1Submit}
+                className="w-full max-w-lg space-y-5"
+              >
                 <div>
-                  <label className="block text-sm font-semibold text-[#014b62] mb-1">Form Title <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-semibold text-[#014b62] mb-1">
+                    Form Title <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={title}
@@ -328,7 +619,9 @@ const CreateForm = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-[#014b62] mb-1">Description <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-semibold text-[#014b62] mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -338,7 +631,9 @@ const CreateForm = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-[#014b62] mb-1">Order <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-semibold text-[#014b62] mb-1">
+                    Order <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     value={order}
@@ -350,7 +645,9 @@ const CreateForm = () => {
                 </div>
                 {isEditMode && (
                   <div>
-                    <label className="block text-sm font-semibold text-[#014b62] mb-1">Status</label>
+                    <label className="block text-sm font-semibold text-[#014b62] mb-1">
+                      Status
+                    </label>
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
@@ -366,7 +663,11 @@ const CreateForm = () => {
                   disabled={loading}
                   className="w-full bg-[#014b62] text-white font-bold py-3 rounded-lg hover:bg-[#023a4b] transition-colors disabled:opacity-60"
                 >
-                  {loading ? "Saving..." : isEditMode ? "Update & Next →" : "Next →"}
+                  {loading
+                    ? "Saving..."
+                    : isEditMode
+                      ? "Update & Next →"
+                      : "Next →"}
                 </button>
               </form>
             </div>
@@ -381,7 +682,9 @@ const CreateForm = () => {
                   <button
                     onClick={() => setShowTypeMenu((v) => !v)}
                     className="w-10 h-10 flex items-center justify-center bg-[#8ba8b4] text-white rounded hover:bg-[#7a9fad] transition-colors text-xl font-light"
-                  >+</button>
+                  >
+                    +
+                  </button>
                   {showTypeMenu && (
                     <div className="absolute left-12 top-0 z-20 bg-white border border-gray-200 rounded shadow-lg min-w-[120px] py-1">
                       {FIELD_TYPES.map((t) => (
@@ -401,15 +704,27 @@ const CreateForm = () => {
                   className="w-10 h-10 flex items-center justify-center bg-[#8ba8b4] text-white rounded hover:bg-[#7a9fad] transition-colors"
                   title="Back to form info"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
                 </button>
               </div>
 
               {/* Form Preview */}
               <div className="flex-1 flex flex-col items-center pr-10">
-                <h2 className="text-2xl font-extrabold text-[#014b62] mb-6">{title}</h2>
+                <h2 className="text-2xl font-extrabold text-[#014b62] mb-6">
+                  {title}
+                </h2>
 
                 {fields.length > 0 && (
                   <div className="w-full max-w-2xl grid grid-cols-2 gap-4 mb-6">
