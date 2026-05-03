@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { deleteForm, updateForm, submitForm } from "../services/form.service";
 
-
 // Decode JWT payload without a library
 const getTokenPayload = () => {
   try {
@@ -144,7 +143,10 @@ const FormDetailModal = ({ form, onClose, onFormDeleted, onFormUpdated }) => {
 
     if (field.type === "radio") {
       return (
-        <div className="relative grid grid-cols-2 gap-2 items-center">
+        <div
+          key={field.name}
+          className="relative grid grid-cols-2 gap-2 items-center"
+        >
           {field.options.map((opt) => (
             <div key={opt} className="flex items-center gap-2">
               <input
@@ -152,7 +154,7 @@ const FormDetailModal = ({ form, onClose, onFormDeleted, onFormUpdated }) => {
                 name={field.name}
                 value={opt}
                 checked={value === opt}
-                onChange={() => handleFieldChange(field.name, opt)}
+                onChange={(e) => handleFieldChange(field.name, opt)}
                 className="w-4 h-4 text-[#014b62] focus:ring-[#014b62]"
               />
               <span className="text-[#014b62]">{opt}</span>
@@ -165,7 +167,9 @@ const FormDetailModal = ({ form, onClose, onFormDeleted, onFormUpdated }) => {
     if (field.type === "textarea") {
       return (
         <textarea
-          placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+          placeholder={
+            field.placeholder || `Enter ${field.label.toLowerCase()}`
+          }
           value={value}
           onChange={onChange}
           rows={3}
@@ -177,7 +181,9 @@ const FormDetailModal = ({ form, onClose, onFormDeleted, onFormUpdated }) => {
     if (field.type === "color") {
       const hexValue = value || "#000000";
       return (
-        <div className={`${baseInput} flex items-center gap-3 p-2 cursor-pointer`}>
+        <div
+          className={`${baseInput} flex items-center gap-3 p-2 cursor-pointer`}
+        >
           {/* Hidden native color picker triggered by clicking the swatch */}
           <label className="relative shrink-0 cursor-pointer">
             <div
