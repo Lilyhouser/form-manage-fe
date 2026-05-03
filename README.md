@@ -3,6 +3,18 @@
 This is the frontend for Form Management project
 Language: ReactJS + Vite
 
+# Test account
+
+```
+# Admin
+userame: admin
+pass: admin
+
+# SW staff
+userame: staff
+pass: staff
+```
+
 # Run project
 
 Require node version >= 22.12.0
