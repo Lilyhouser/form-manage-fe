@@ -7,8 +7,15 @@ Language: ReactJS + Vite
 
 Require node version >= 22.12.0
 
-Clone project: [git clone https://github.com/Lilyhouser/form-manage-fe.git]
-run [npm install] to install dependencies
-run [npm run dev] for development stage
+```
+# Clone project
+git clone https://github.com/Lilyhouser/form-manage-fe.git
+
+# Install dependencies
+npm install
+
+# Run project
+npm run dev
+```
 
 FE must run at: http://localhost:5173
